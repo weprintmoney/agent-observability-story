@@ -44,9 +44,9 @@
   <div class="prose">
     <p>A <strong>docs-drift reviewer</strong> on Claude Opus 5.5.</p>
     <ul class="kv">
-      <li><b>The problem</b> My agent pipelines use per-folder <code>CLAUDE.md</code> files as an index for their context navigation. When a new PR merges into the repository and the index drifts from the contents, downstream agents silently miss documents. I used to manually check for this drift periodically.</li>
-      <li><b>The agent</b> Given a merged PR, it reads the repo's own doc rules, checks every added or renamed file against the nearest index, greps the index docs for stale paths, and submits structured findings. A deterministic verifier re-checks each finding and marks the root span ERROR if one doesn't hold up.</li>
-      <li><b>The data</b> To create and test this agent, I used 74 labeled PRs from two of my repos. Real user (me), real failure cost, real ground truth: the repos carry an explicit "update the doc index" hook, so my merge history provided a labeled dataset.</li>
+      <li><b>The problem</b> My agent pipelines treat per-folder <code>CLAUDE.md</code> files as the index for context navigation. When a PR merges and that index drifts from the repo, downstream agents silently miss documents. I used to check for this drift by hand.</li>
+      <li><b>The agent</b> Given a merged PR, the agent reads the repo’s own doc rules, checks every added or renamed file against the nearest index, greps the index docs for stale paths, and submits structured findings. A deterministic verifier re-checks each finding and marks the root span ERROR if one does not hold up.</li>
+      <li><b>The data</b> I built and tested it on 74 labeled PRs from two of my repos. The user, the failure cost, and the ground truth are all real: those repos carry an explicit “update the doc index” hook, so merge history was already a labeled dataset.</li>
     </ul>
     <figure class="band"><svg viewBox="0 0 760 230" role="img" aria-label="Agent shape: one AGENT root span, a loop of LLM and TOOL spans, and a verifier CHAIN span">
           <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker></defs>
