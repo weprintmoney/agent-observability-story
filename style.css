@@ -164,3 +164,13 @@ footer { border-top: 1px solid var(--line); margin-top: 64px; padding: 32px 0 80
 .ex-cols p { margin: 0 }
 .ex-foot { font-size: 13px; color: var(--faint); margin: 16px 0 0 }
 .prov { font-family: var(--mono); font-size: 13px; color: var(--muted); margin: 14px 0 0 }
+
+/* ---------- tone rewrite ---------- */
+.tldr { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 14px 18px; border-radius: 0 10px 10px 0; margin: 8px 0 8px }
+.tldr b { font-family: var(--display); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent) }
+.tldr p { margin: 6px 0 0; font-size: 17px }
+ul.kv { list-style: none; padding: 0; margin: 14px 0 }
+ul.kv li { margin: 10px 0; padding-left: 14px; border-left: 2px solid var(--line) }
+ul.kv b { font-family: var(--display); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 2px }
+ol.good { padding-left: 24px; margin: 14px 0 } ol.good li { margin: 12px 0 } ol.good b { font-family: var(--display) }
+.part-head.sub { border-top: 0; padding-top: 40px } .part-head.sub h3 { font-family: var(--serif); font-weight: 500; font-size: 26px; margin: 0 }

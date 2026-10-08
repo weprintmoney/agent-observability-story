@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent evals that work on day one</title>
-<meta name="description" content="Arize PM take-home: I built a docs-drift reviewer agent, put it on Arize AX, ran the observability and development workflows, ranked every rough edge, and proposed what I would build next.">
+<meta name="description" content="An Arize AX field test: a real agent, what worked, what broke, the aha about trajectory-aware judging, and what I would build next.">
 <meta property="og:title" content="Agent evals that work on day one">
 <meta property="og:description" content="A week of using Arize AX on a real agent, every rough edge ranked, and a product proposal with mocks, sequencing and metrics.">
 <meta name="robots" content="noindex">
@@ -14,39 +14,41 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <header class="top">
-  <a href="#top" class="brand">Arize AX take-home</a>
+  <a href="#top" class="brand">Arize AX field test</a>
   <nav aria-label="Sections">
-    <a href="#built">Built</a><a href="#observe">Observability</a><a href="#develop">Development</a><a href="#friction">Friction</a><a href="#proposal">Proposal</a><a href="#artifacts">Artifacts</a>
+    <a href="#built">Built</a><a href="#good">The good</a><a href="#rough-edges">The friction</a><a href="#aha">The aha</a><a href="#proposal">Proposal</a><a href="#artifacts">Artifacts</a>
   </nav>
   <button class="theme-toggle" type="button" aria-label="Toggle dark mode">◐</button>
 </header>
 
 <section class="hero" id="top">
   <div class="hero-inner">
-    <div class="kicker">Arize AX · PM take-home · October 2026</div>
+    <div class="kicker">Arize PM take-home · an AX field test</div>
     <h1>Agent evals that <em>work on day one</em></h1>
-    <p class="dek">I built an agent I needed, put it on Arize AX, and ran both workflows on it. Tracing paid off in a minute. A score I could trust took 25 minutes and three failures. That gap is what I'd build for.</p>
-    <div class="byline"><span>By <b>Charlcye Mitchell</b></span><span>2026-10-03 to 2026-10-07</span><span>free tier</span><span>~9 min read</span></div>
-    <p class="prov">Text and judgments by me. The harness, verifier and experiment runner were written with Claude Code.</p>
+    <div class="byline"><span>By <b>Charlcye Mitchell</b></span><span>Oct 3 to 7, 2026</span><span>Free tier</span><span>~9 min read</span></div>
+    <p class="prov">Judgments, hurt scores and the proposal are mine. I used Claude Code to build the harness and verifier, drive the AX UI for the screenshots, and draft this write-up, which I edited.</p>
   </div>
 </section>
 
 <div class="prose">
-  <div class="summary">
-    <div><b>What I built</b><span>A docs-drift reviewer: a tool-loop agent on Claude Opus 5.5 that checks merged PRs against my repos' own index rules. It has a real user (me) and real ground truth.</span></div>
-    <div><b>What I did in AX</b><span>Tracing with OpenInference spans, an online LLM judge built in the UI, code evals logged through the SDK, a 70-row dataset, and a prompt v1 vs v2 experiment with six evaluators.</span></div>
-    <div><b>What hurt</b><span>14 rough edges, ranked. The 4s and 5s all sit on one path: getting from "traces are flowing" to "an eval I believe" on an agent project.</span></div>
-    <div><b>What I'd build</b><span>A free Agent Health pack of six deterministic evals, a trajectory variable offered first for agent judges, and pre-flight before Save. Three repro fixes ship first.</span></div>
+  <div class="tldr">
+    <b>TL;DR</b>
+    <p>I built a real agent and ran it through Arize AX. <strong>The good news:</strong> tracing paid off in 60 seconds. <strong>The gap:</strong> a score I could trust took 25 minutes and three failures in a row. Here's what I built, what worked, where it broke, and what I'd build so the next developer reaches the "this works" moment in under five minutes.</p>
   </div>
 </div>
 
 <!-- ============================================================ 1 -->
 <section class="part" id="built">
-  <div class="part-head"><div class="num">1</div><h2>What I built and why</h2></div>
+  <div class="part-head"><div class="num">1</div><h2>What I built, and why</h2></div>
   <div class="prose">
-    <p>My agent pipelines use per-folder <code>CLAUDE.md</code> files as their map. When an index drifts, downstream agents silently miss documents. I used to check every merge by hand.</p>
-    <p>Given a merged PR, the agent reads the repo's own documentation rules, checks every added or renamed file against the nearest index, greps the index docs for references to renamed paths, and submits structured findings. A deterministic verifier re-checks each finding against the repo and marks the root span ERROR if any finding doesn't hold up.</p>
+    <p>A <strong>docs-drift reviewer</strong> on Claude Opus 5.5.</p>
+    <ul class="kv">
+      <li><b>The problem</b> My agent pipelines use per-folder <code>CLAUDE.md</code> files as their map. When a PR merges and the index drifts, downstream agents silently miss documents. I used to check every merge by hand.</li>
+      <li><b>The agent</b> Given a merged PR, it reads the repo's own doc rules, checks every added or renamed file against the nearest index, greps the index docs for stale paths, and submits structured findings. A deterministic verifier re-checks each finding and marks the root span ERROR if one doesn't hold up.</li>
+      <li><b>The data</b> 74 labeled PRs from two of my repos. Real user (me), real failure cost, real ground truth: the repos carry an explicit "update the doc index" rule, so merge history is a labeled dataset.</li>
+    </ul>
     <figure class="band"><svg viewBox="0 0 760 230" role="img" aria-label="Agent shape: one AGENT root span, a loop of LLM and TOOL spans, and a verifier CHAIN span">
           <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker></defs>
           <g font-size="13" fill="var(--ink)">
@@ -63,47 +65,132 @@
           <text x="10" y="186" font-size="13" fill="var(--muted)">Five read-only tools. A deterministic verifier re-checks every finding against the repo</text>
           <text x="10" y="206" font-size="13" fill="var(--muted)">and marks the root span ERROR if any finding doesn't hold up.</text>
           </g>
-        </svg><figcaption>One AGENT root, auto-instrumented LLM spans, a TOOL span per tool call, one CHAIN span for the verifier. 4 to 7 turns per review.</figcaption></figure>
-    <p><strong>Why this use case.</strong> It has a real user, a real failure cost, and real ground truth. My repos carry an explicit rule ("update the doc index when adding files"), so merge history is a labeled dataset. I labeled 74 PRs from two repos as drift or clean; 70 at high or medium confidence went into AX. First traced batch: right on 26 of 31, plus 6 verified problems my labels had missed. Two of the first three "false positives" turned out to be label errors. The agent corrected my labels three times before the week was out.</p>
+        </svg><figcaption>One AGENT root, auto-instrumented LLM spans, a TOOL span per call, one CHAIN span for the verifier. 4 to 7 turns per review.</figcaption></figure>
+    <p><strong>First traced batch:</strong> right on 26 of 31, plus 6 verified problems my labels had missed. Two of my first three "false positives" were label errors. The agent corrected my dataset three times that week.</p>
   </div>
 </section>
 
 <!-- ============================================================ 2 -->
-<section class="part" id="observe">
-  <div class="part-head"><div class="num">2</div><h2>Observability workflow</h2><p class="intro">Tracing, then an online judge, then the thing the judge couldn't see.</p></div>
+<section class="part" id="good">
+  <div class="part-head"><div class="num">2</div><h2>The good: where AX shines</h2></div>
   <div class="prose">
-    <h3>Tracing worked first try</h3>
-    <p><code>register()</code>, the Anthropic auto-instrumentor, and my own AGENT, TOOL and CHAIN spans. Traces appeared within a minute. The trace drawer is the best screen in the product: the whole agent in one tree, with latency and tokens per step, and the review summary readable in place.</p>
-    <p>Agent Graph got the topology right in one look. It flattens the order, though: you can't see that <code>get_pr</code> always runs first and <code>submit_review</code> last. Order lives in Agent Path.</p>
+    <ol class="good">
+      <li><b>Tracing worked on the first try.</b> <code>register()</code>, the Anthropic auto-instrumentor, and my own AGENT, TOOL and CHAIN spans. Traces appeared in under a minute.</li>
+      <li><b>The trace drawer is the best screen in the product.</b> The whole agent in one tree, latency and tokens per step, the review summary readable in place. This is the screen that made me trust the rest.</li>
+      <li><b>Agent Graph got the topology right in one look.</b> Start, the agent, six tool and LLM nodes, end. Sequence is flattened, so you can't see that <code>get_pr</code> always runs first; that lives in Agent Path.</li>
+      <li><b>Dataset upload just worked.</b> 70 rows as a list of dicts, mixed string and integer columns, first try. One gap: when the agent corrected a label, I couldn't find the example to update in place within the default page size of 50, so I shipped a v2 dataset (versioning is in the API, I just didn't reach it). There's also no one-click "this row's label is wrong" from the experiment view back into the dataset, and I needed it three times.</li>
+      <li><b>Experiments saved me from shipping a bad prompt.</b> I wrote prompt v2 with two rules the first batch had missed, then ran v1 against v2 over all 70 labeled PRs as AX experiments: the agent as the task, five code evaluators, one LLM judge. v2 fixed the case it was written for and broke three others. Without the experiment I'd have shipped the regression on one fixed example.</li>
+    </ol>
   </div>
   <div class="gallery wide">
     <figure><img src="img/03-trace-drawer-agent-tree.jpg" alt="Arize AX trace drawer: the AGENT root with interleaved LLM and TOOL spans, latency and tokens per span, and the review summary as output" loading="lazy"><figcaption>Trace drawer: the agent, readable.</figcaption></figure>
-    <figure><img src="img/04-agent-graph.jpg" alt="Arize AX Agent Graph: start, the review agent, six tool and LLM nodes, end" loading="lazy"><figcaption>Agent Graph: correct topology, sequence flattened.</figcaption></figure>
-    <figure><img src="img/05-cost-tab-tokens-but-no-dollars.jpg" alt="Cost tab with token counts but no dollar cost" loading="lazy"><figcaption>687k input tokens counted, model name on every span, cost "--".</figcaption></figure>
-    <figure><img src="img/06-add-evaluator-modal-code-evaluator-enterprise.jpg" alt="Add Evaluator modal with Code Evaluator marked Enterprise" loading="lazy"><figcaption>The first gate: Code Evaluator is Enterprise-only.</figcaption></figure>
+    <figure><img src="img/04-agent-graph.jpg" alt="Arize AX Agent Graph: start, the review agent, six tool and LLM nodes, end" loading="lazy"><figcaption>Agent Graph: right topology, flattened order.</figcaption></figure>
   </div>
+    <div class="prose"><figure class="band"><svg viewBox="0 0 640 440" role="img" aria-label="Prompt v1 versus v2 on 70 labeled pull requests: v1 64 of 70 correct, v2 61 of 69; v2 fixed one row and broke three">
+          <text x="20" y="30" font-size="14" font-weight="700" fill="var(--ink)">Label accuracy, 70 labeled PRs · Claude Opus 5.5</text>
+          <g font-size="13" fill="var(--ink)">
+            <text x="20" y="84" font-weight="600">Prompt v1</text><text x="20" y="102" font-size="11" fill="var(--muted)">as shipped</text>
+            <rect x="130" y="70" width="440" height="30" rx="3" fill="var(--line)"/><rect x="130" y="70" width="402" height="30" rx="3" fill="var(--accent)" opacity=".85"/>
+            <text x="520" y="90" text-anchor="end" fill="#fff" font-weight="700">64 / 70 · 91%</text>
+            <text x="20" y="154" font-weight="600">Prompt v2</text><text x="20" y="172" font-size="11" fill="var(--muted)">+ two rules from traces</text>
+            <rect x="130" y="140" width="440" height="30" rx="3" fill="var(--line)"/><rect x="130" y="140" width="389" height="30" rx="3" fill="var(--accent-2)" opacity=".85"/>
+            <text x="507" y="160" text-anchor="end" fill="#fff" font-weight="700">61 / 69 · 88%</text>
+          </g>
+          <text x="20" y="226" font-size="13" font-weight="700" fill="var(--ink)">What changed, row by row</text>
+          <g font-size="12" fill="var(--ink)">
+            <rect x="20" y="242" width="600" height="34" rx="6" fill="var(--surface)" stroke="var(--good)"/><text x="34" y="264"><tspan fill="var(--good)" font-weight="700">fixed 1 ·</tspan> new top-level folder now flagged as missing from the root index (the target case)</text>
+            <rect x="20" y="284" width="600" height="34" rx="6" fill="var(--surface)" stroke="var(--bad)"/><text x="34" y="306"><tspan fill="var(--bad)" font-weight="700">broke 3 ·</tspan> nested folders now called clean: "sits under 03-corporate-finance/, not at the root"</text>
+            <rect x="20" y="326" width="600" height="34" rx="6" fill="var(--surface)" stroke="var(--line)"/><text x="34" y="348"><tspan fill="var(--muted)" font-weight="700">failed 1 ·</tspan> GitHub TLS timeout, raised, and shown as failed in AX this time</text>
+          </g>
+          <text x="20" y="398" font-size="11" fill="var(--muted)">One pass per variant via the Claude Agent SDK, 2026-10-07. A 3-row swing on 70 is within run-to-run noise;</text>
+          <text x="20" y="414" font-size="11" fill="var(--muted)">the row-level diff is the finding. Five code evaluators + one LLM judge, scored and stored in AX.</text>
+        </svg><figcaption>The experiment that stopped v2. A 3-row swing on 70 is within noise; the row-level diff is the finding. The new rule taught the model that only root-level folders count.</figcaption></figure></div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section class="part" id="rough-edges">
+  <div class="part-head"><div class="num">3</div><h2>The friction: what needs fixing</h2><p class="intro">Getting to an eval I trusted was the bumpy part. The five that matter, then the full list ranked by how much each would hurt a team on a trial.</p></div>
+
   <div class="prose">
-    <h3>Tokens counted, dollars missing</h3>
-    <p>AX counted 687k input tokens with <code>llm.model_name</code> on every LLM span. Cost still read "--" in the project header, Cost, Sessions and Experiments, next to an upsell for a cost-reduction agent. You can't reduce spend you can't see. A default price table for the ten most common models would fill this in for everyone on day one.</p>
+    <h3>1. Cost is a black box</h3>
+    <ul class="kv">
+      <li><b>The issue</b> AX counted 687k input tokens and had the model name on every span. Cost read "--" everywhere: project header, Cost tab, Sessions, Experiments. Right next to an upsell for a cost-reduction agent.</li>
+      <li><b>The fix</b> Ship a default price table for the ten most common models. You can't reduce spend you can't see.</li>
+    </ul>
+  </div>
+  <div class="gallery wide two">
+    <figure><img src="img/05-cost-tab-tokens-but-no-dollars.jpg" alt="Cost tab with token counts but no dollar cost" loading="lazy"><figcaption>687k tokens counted, $0 shown.</figcaption></figure>
+    <figure><img src="img/11-evals-tab-time-range-paywall.jpg" alt="Evals and Metrics tab blurred behind a message: you don't have access to this time range, upgrade to Pro" loading="lazy"><figcaption>Bonus: opening the Cost tab silently set "Last Month." The Evals tab then paywalled a range I never chose.</figcaption></figure>
+  </div>
 
-    <h3>The first gate</h3>
-    <p>The first evals I wanted were deterministic: did it submit, did findings verify, did it stay in budget. Code Evaluator is Enterprise-only, so I computed them locally and wrote them back with <code>spans.update_evaluations</code>. All 32 failed with "No matching span found." The real cause, printed at INFO level above the errors: dots aren't allowed in eval names. Ten minutes chasing span ids for a naming rule.</p>
+  <div class="prose">
+    <h3>2. The first gate: Code Evaluators, and a hidden naming rule</h3>
+    <ul class="kv">
+      <li><b>The issue</b> The first evals I wanted were deterministic: did it submit, did the findings verify, did it stay in budget. Code Evaluator is Enterprise-only. So I computed them locally and wrote them back with <code>spans.update_evaluations</code>. All 32 failed with "No matching span found."</li>
+      <li><b>The cause</b> Dots aren't allowed in eval names. That rule prints at INFO level, above the errors. I spent ten minutes chasing span ids for a naming mistake.</li>
+      <li><b>The fix</b> Make the naming rule a validation error, and fail the call when every eval column gets dropped. And put the cheapest, first evals a developer writes on every plan (more on that in the proposal).</li>
+    </ul>
 
-    <h3>An LLM judge, built in the UI</h3>
-    <p>Next, a judge: is the review summary grounded in the findings? The builder is linear and clear. Type, name, scope, model, template with <code>{variables}</code>, map to columns with a live preview of the span's value. Then "Test Evaluator On Spans" failed three ways in a row.</p>
+    <h3>3. The LLM judge builder failed three times in a row</h3>
+    <p>The builder itself is clear and linear: type, name, scope, model, template with <code>{variables}</code>, map to real columns with a live preview. Then "Test Evaluator On Spans":</p>
+    <ol class="good">
+      <li><b>Raw GraphQL error.</b> "Classification choices are required." Nothing in the form had asked for them. The Labels section sits below the template, below the fold, with no required marker.</li>
+      <li><b>Provider error.</b> The runner forces <code>tool_choice</code>, which Claude 5.5 models reject. The picker offers those models anyway. <em>Eng note: an afternoon's fix (don't force tool choice on models that reject it, or hide them). A trial user just concludes evals are broken.</em></li>
+      <li><b>The workaround, found by guessing.</b> Advanced Options, "Enable Function Calling" off. Third test: GROUNDED in about 8 seconds. The model was fine the whole time.</li>
+    </ol>
   </div>
   <div class="gallery wide">
-    <figure><img src="img/07-judge-test-raw-graphql-error.jpg" alt="Evaluator test failed with a raw GraphQL mutation error about classification choices" loading="lazy"><figcaption>Attempt 1: a raw GraphQL mutation error. Nothing in the form had asked for labels.</figcaption></figure>
-    <figure><img src="img/08-judge-labels-below-the-fold.jpg" alt="The Labels section of the evaluator builder, below the template, with two placeholder rows and no required marker" loading="lazy"><figcaption>The missing labels, below the fold, with no required marker.</figcaption></figure>
-    <figure><img src="img/09-judge-tool-choice-error-sonnet-5-5.jpg" alt="Evaluator test failed: tool_choice type tool and any are not supported for this model" loading="lazy"><figcaption>Attempt 2: the runner forces tool_choice. Claude 5.5 models reject it. The picker offers them anyway.</figcaption></figure>
-    <figure><img src="img/10-judge-works-with-function-calling-off.jpg" alt="Evaluator builder with Enable Function Calling switched off and a successful GROUNDED test result" loading="lazy"><figcaption>Attempt 3: Advanced Options, "Enable Function Calling" off. Found by guessing.</figcaption></figure>
+    <figure><img src="img/07-judge-test-raw-graphql-error.jpg" alt="Evaluator test failed with a raw GraphQL mutation error about classification choices" loading="lazy"><figcaption>Attempt 1: an engineer's error for a user's mistake.</figcaption></figure>
+    <figure><img src="img/08-judge-labels-below-the-fold.jpg" alt="The Labels section of the evaluator builder, below the template, with two placeholder rows and no required marker" loading="lazy"><figcaption>The missing labels, below the fold.</figcaption></figure>
+    <figure><img src="img/09-judge-tool-choice-error-sonnet-5-5.jpg" alt="Evaluator test failed: tool_choice type tool and any are not supported for this model" loading="lazy"><figcaption>Attempt 2: the newest model in the picker can't run a judge.</figcaption></figure>
+    <figure><img src="img/10-judge-works-with-function-calling-off.jpg" alt="Evaluator builder with Enable Function Calling switched off and a successful GROUNDED test result" loading="lazy"><figcaption>Attempt 3: function calling off. It works.</figcaption></figure>
   </div>
-  <div class="prose">
-    <p>An engineer would fix the tool_choice problem in an afternoon. A trial user would conclude evals don't work.</p>
 
-    <h3>Then it worked, and taught me something</h3>
-    <p>The first backfill scored 24 of 29 AGENT spans: 19 GROUNDED, 5 UNGROUNDED, which is the 79% in the screenshot. Over the full 32 it settled at 24 GROUNDED, 8 UNGROUNDED. Every UNGROUNDED explanation had the same shape. The summary stated something the agent had verified with a tool ("nothing was renamed or deleted"), and the judge, which sees only <code>attributes.output.value</code> on the AGENT span, called it unsupported. The trace held the <code>get_pr</code> result that proved it. The judge never saw it.</p>
-    <p>Right about its inputs. Wrong about the agent.</p>
+  <div class="prose">
+    <h3>4. The silent-failure experiment</h3>
+    <ul class="kv">
+      <li><b>The issue</b> My first experiment ran out of API credits after 16 rows. My task returned the error string instead of raising. AX marked all 70 runs COMPLETED and my evaluators scored 54 identical error strings as predictions.</li>
+      <li><b>Whose bug</b> Mine, and I fixed it: the task now raises, and evaluators skip failed rows. But the experiment page showed 70 green runs with no hint that 54 outputs were the same string.</li>
+      <li><b>The fix</b> One heuristic nudge: "54 of 70 outputs are identical. Do these look like errors?"</li>
+    </ul>
+    <figure class="band"><svg viewBox="0 0 640 380" role="img" aria-label="Seventy experiment runs all marked completed; fifty-four of them contain the same error string">
+          <text x="20" y="34" font-size="14" font-weight="700" fill="var(--ink)">70 runs · status: COMPLETED</text>
+          <g id="silentgrid"></g>
+          <text x="20" y="330" font-size="13" fill="var(--muted)"><tspan fill="var(--good)" font-weight="700">■</tspan> real review (16) &nbsp; <tspan fill="var(--bad)" font-weight="700">■</tspan> "credit balance is too low" (54), scored as a prediction</text>
+        </svg></figure>
+
+    <h3>5. Prompt Playground: close, but two bugs in the loop</h3>
+    <ul class="kv">
+      <li><b>What it is</b> A single-call prompt tool: dataset variables, optional function schemas, one model call per row. It can't run my tool loop (the "agent endpoint" quickstart is the path for that), but it can compare judge prompts over the agent's real outputs, which is what I tried.</li>
+      <li><b>The issue</b> Column B's model picker closed itself about a second after opening, six attempts running. Two datasets I'd created through the SDK minutes earlier didn't appear in the dropdown until a hard reload. The comparison ran from code instead.</li>
+      <li><b>Why it matters</b> The code-to-UI loop the dev workflow depends on has a cache in it, and the A/B tool's B column is hard to configure.</li>
+    </ul>
+  </div>
+  <div class="gallery wide two">
+    <figure><img src="img/13-playground-compare-prompts.jpg" alt="Prompt Playground Compare Prompts view with two columns, a dataset selector and one input row" loading="lazy"><figcaption>Compare Prompts: the A/B layout where B wouldn't stay open.</figcaption></figure>
+    <figure><img src="img/06-add-evaluator-modal-code-evaluator-enterprise.jpg" alt="Add Evaluator modal with Code Evaluator marked Enterprise" loading="lazy"><figcaption>The first gate: Code Evaluator is Enterprise-only.</figcaption></figure>
+  </div>
+
+  <div class="part-head sub"><h3>Every rough edge, ranked</h3><p class="intro">1 = shrug. 5 = a team on a trial stops here. Scores were assigned as each item was logged, not later.</p></div>
+  <div class="wide">
+    <div class="friction" id="friction"></div>
+    <p class="note"><strong>Where the high scores cluster is the finding.</strong> Tracing issues scored 2s and 3s. The path from "traces are flowing" to "a score I trust" scored 4s and 5s. Four of the top six sit on that path.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 4 -->
+<section class="part" id="aha">
+  <div class="part-head"><div class="num">4</div><h2>The aha: an agent judge has to see the trajectory</h2></div>
+  <div class="prose">
+    <p>When the online judge finally ran, it scored 24 of 32 reviews GROUNDED and 8 UNGROUNDED. (The first backfill, in the screenshot, was 19 of 24 scored spans, which is the 79%.)</p>
+    <p>I read the 8 failures. Every one had the same shape. The agent's summary stated something it had verified with a tool ("nothing was renamed or deleted"). The judge, which sees only <code>attributes.output.value</code> on the AGENT span, called it unsupported. The trace held the <code>get_pr</code> result that proved it. The judge never saw it.</p>
+    <p><strong>The judge was right about its inputs and wrong about the agent.</strong></p>
+    <h3>I tested the fix instead of asserting it</h3>
+    <p>I exported the 32 traces from AX and re-judged each one twice with Claude Sonnet 5.5: once on the output alone, once with the agent's task, its rules, and its tool calls in order.</p>
+    <ul class="kv">
+      <li><b>Without the trajectory</b> A strict judge passed 2 of 32. AX's lenient template had passed 24. The verdict tracked the prompt, not the agent.</li>
+      <li><b>With the trajectory</b> 26 of 32. Five of the eight UNGROUNDED verdicts flipped to GROUNDED, each citing the tool result. Three reviews AX had passed were now flagged, each citing the line the summary contradicted. On my reading, all three flags are right.</li>
+    </ul>
   </div>
   <div class="gallery wide two">
     <figure><img src="img/12-online-judge-79pct-grounded.jpg" alt="Evals tab: review-grounded-judge at 79.2 percent GROUNDED; cost shows no data" loading="lazy"><figcaption>The online judge running. Cost still "--" above it.</figcaption></figure>
@@ -126,12 +213,6 @@
           <text x="20" y="414" font-size="11" fill="var(--muted)">Re-judged with Claude Sonnet 5.5 on 2026-10-07. Traces exported from AX and re-judged offline.</text>
         </svg></figure>
   </div>
-  <div class="prose">
-    <h3>I tested the fix instead of asserting it</h3>
-    <p>My proposal was going to claim that showing the judge the trajectory would fix this. So I tested it. I exported the 32 traces from AX and re-judged each one twice with Claude Sonnet 5.5: once on the output alone, once with the agent's task, its rules and its tool calls in order.</p>
-    <p>Output alone, a strict judge passed 2 of 32. AX's lenient template had passed 24. <strong>Without the trajectory, the verdict tracked the prompt, not the agent.</strong> With the trajectory, 26 of 32. Five of the eight UNGROUNDED verdicts flipped to GROUNDED. Three reviews AX's judge had passed were now flagged, each citing the line the summary contradicted. On my reading, all three flags are right.</p>
-  </div>
-
   <div class="wide">
     <div class="band explorer" id="explorer">
       <div class="ex-head">
@@ -154,62 +235,9 @@
       <p class="ex-foot">Re-judged with Claude Sonnet 5.5 on 2026-10-07 from the 32 traces exported from AX. Explanations are the judge's own, trimmed, with names from my course repos replaced by roles. The AX online verdicts come from the review-grounded-judge task in the project.</p>
     </div>
   </div>
-</section>
 
-<!-- ============================================================ 3 -->
-<section class="part" id="develop">
-  <div class="part-head"><div class="num">3</div><h2>Development workflow</h2><p class="intro">Dataset, experiment, Playground. One real finding, one failure that looked like success.</p></div>
   <div class="prose">
-    <h3>Dataset upload worked first try</h3>
-    <p>70 rows as a list of dicts, mixed string and integer columns. When the agent corrected a label I couldn't find the example to update in place within the default page size of 50, so I shipped a v2 dataset. Versioning is in the API (<code>new_version=</code>); I just didn't reach it. There's also no one-click way to send "this experiment row's label is wrong" back into the dataset from the experiment view, and I needed it three times.</p>
-
-    <h3>Prompt v1 vs v2, scored in AX</h3>
-    <p>From the first traced batch I wrote prompt v2 with two rules the agent had missed, including "a new top-level folder is itself an index entry." Then I ran both prompts over all 70 labeled PRs as AX experiments, with the agent as the task, five code evaluators (label match, doc recall, doc precision, verified rate, content-finding count) and one LLM judge.</p>
-    <figure class="band"><svg viewBox="0 0 640 440" role="img" aria-label="Prompt v1 versus v2 on 70 labeled pull requests: v1 64 of 70 correct, v2 61 of 69; v2 fixed one row and broke three">
-          <text x="20" y="30" font-size="14" font-weight="700" fill="var(--ink)">Label accuracy, 70 labeled PRs · Claude Opus 5.5</text>
-          <g font-size="13" fill="var(--ink)">
-            <text x="20" y="84" font-weight="600">Prompt v1</text><text x="20" y="102" font-size="11" fill="var(--muted)">as shipped</text>
-            <rect x="130" y="70" width="440" height="30" rx="3" fill="var(--line)"/><rect x="130" y="70" width="402" height="30" rx="3" fill="var(--accent)" opacity=".85"/>
-            <text x="520" y="90" text-anchor="end" fill="#fff" font-weight="700">64 / 70 · 91%</text>
-            <text x="20" y="154" font-weight="600">Prompt v2</text><text x="20" y="172" font-size="11" fill="var(--muted)">+ two rules from traces</text>
-            <rect x="130" y="140" width="440" height="30" rx="3" fill="var(--line)"/><rect x="130" y="140" width="389" height="30" rx="3" fill="var(--accent-2)" opacity=".85"/>
-            <text x="507" y="160" text-anchor="end" fill="#fff" font-weight="700">61 / 69 · 88%</text>
-          </g>
-          <text x="20" y="226" font-size="13" font-weight="700" fill="var(--ink)">What changed, row by row</text>
-          <g font-size="12" fill="var(--ink)">
-            <rect x="20" y="242" width="600" height="34" rx="6" fill="var(--surface)" stroke="var(--good)"/><text x="34" y="264"><tspan fill="var(--good)" font-weight="700">fixed 1 ·</tspan> new top-level folder now flagged as missing from the root index (the target case)</text>
-            <rect x="20" y="284" width="600" height="34" rx="6" fill="var(--surface)" stroke="var(--bad)"/><text x="34" y="306"><tspan fill="var(--bad)" font-weight="700">broke 3 ·</tspan> nested folders now called clean: "sits under 03-corporate-finance/, not at the root"</text>
-            <rect x="20" y="326" width="600" height="34" rx="6" fill="var(--surface)" stroke="var(--line)"/><text x="34" y="348"><tspan fill="var(--muted)" font-weight="700">failed 1 ·</tspan> GitHub TLS timeout, raised, and shown as failed in AX this time</text>
-          </g>
-          <text x="20" y="398" font-size="11" fill="var(--muted)">One pass per variant via the Claude Agent SDK, 2026-10-07. A 3-row swing on 70 is within run-to-run noise;</text>
-          <text x="20" y="414" font-size="11" fill="var(--muted)">the row-level diff is the finding. Five code evaluators + one LLM judge, scored and stored in AX.</text>
-        </svg></figure>
-    <p>v2 fixed the case it was written for and broke three others. <strong>The rule taught the model that only root-level folders count.</strong> I'm keeping v1 and scoping the rule tighter. Without the experiment I'd have shipped v2 on one fixed example.</p>
-
-    <h3>The failure that looked like success</h3>
-    <p>My first attempt ran out of API credits after 16 rows. My task returned the error instead of raising it, so AX marked all 70 runs COMPLETED and my evaluators scored 54 identical error strings as predictions.</p>
-    <figure class="band"><svg viewBox="0 0 640 380" role="img" aria-label="Seventy experiment runs all marked completed; fifty-four of them contain the same error string">
-          <text x="20" y="34" font-size="14" font-weight="700" fill="var(--ink)">70 runs · status: COMPLETED</text>
-          <g id="silentgrid"></g>
-          <text x="20" y="330" font-size="13" fill="var(--muted)"><tspan fill="var(--good)" font-weight="700">■</tspan> real review (16) &nbsp; <tspan fill="var(--bad)" font-weight="700">■</tspan> "credit balance is too low" (54), scored as a prediction</text>
-        </svg></figure>
-    <p>That bug was mine, and I fixed it (the task now raises, and evaluators skip failed rows). But the experiment page showed 70 completed runs with no hint that 54 outputs were the same string. One "these outputs look like errors" nudge would have caught it.</p>
-
-    <h3>Prompt Playground</h3>
-    <p>Good empty state, three quickstarts. It's a single-call prompt tool: dataset variables, optional function schemas, one model call per row. My agent is a multi-turn tool loop, so the Playground can't run it; the "agent endpoint" quickstart is the intended path and needs a hosted URL. What it can do for me is compare judge prompts over the agent's real outputs, and that's what I tried. Column B's model picker closed itself about a second after opening, six attempts running, and two datasets created through the SDK minutes earlier didn't appear in the dataset combobox until a page reload. The comparison ran from code instead.</p>
-  </div>
-  <div class="gallery wide two">
-    <figure><img src="img/13-playground-compare-prompts.jpg" alt="Prompt Playground Compare Prompts view with two columns, a dataset selector and one input row" loading="lazy"><figcaption>Playground, Compare Prompts: the A/B layout where column B's picker wouldn't stay open.</figcaption></figure>
-    <figure><img src="img/11-evals-tab-time-range-paywall.jpg" alt="Evals and Metrics tab blurred behind a message: you don't have access to this time range, upgrade to Pro" loading="lazy"><figcaption>Opening the Cost tab silently set "Last Month". The Evals tab then paywalled a range I never chose.</figcaption></figure>
-  </div>
-</section>
-
-<!-- ============================================================ 4 -->
-<section class="part" id="friction">
-  <div class="part-head"><div class="num">4</div><h2>Every rough edge, ranked by how much it would hurt a real team</h2><p class="intro">1 = shrug. 5 = a team on a trial stops here. Each item was logged with a date as it happened, and most have a screenshot.</p></div>
-  <div class="wide">
-    <div class="friction" id="friction"></div>
-    <p class="note">What stands out is where the high scores cluster. <strong>The tracing issues scored 2s and 3s. The path from traces to a score I trust scored 4s and 5s.</strong> Four of the top six sit between "traces are flowing" and "I have an eval I believe."</p>
+    <p><strong>The product implication:</strong> if an LLM judge grades an agent on its output alone, it will fail in a confident, well-explained way. It has to see the tool loop. That's feature B below.</p>
   </div>
 </section>
 
@@ -229,13 +257,16 @@
             <rect x="200" y="376" width="240" height="52" rx="8" fill="var(--ink)"/><text x="320" y="407" text-anchor="middle" font-weight="700" fill="var(--bg)">A score I trust · ~25 min</text>
           </g>
         </svg></figure>
-    <p><strong>The public record agrees.</strong> Across 1,960 public developer posts I coded over the last six months, agent testing and eval authoring are the second and third largest themes outside GitHub. LangSmith and Braintrust put code evaluators on their free tiers.</p>
-    <p><strong>And it gets more urgent, not less.</strong> Providers now publish a minimum model life of about 12 months, and by my count 21 text-model shutdowns are scheduled between October 20 and December 11, 2026. Every agent gets re-qualified on a new model at least once a year, which makes evals a regression suite that matters most on the day a model disappears. Dynatrace and Datadog management both name token overruns as the customer fear, which is why a dollar figure on every trace is table stakes.</p>
-  </div>
+    <ul class="kv">
+      <li><b>The public record agrees</b> Across 1,960 public developer posts I coded over six months, agent testing and eval authoring are the second and third largest themes outside GitHub. LangSmith and Braintrust put code evaluators on their free tiers.</li>
+      <li><b>It gets more urgent</b> Providers now publish a minimum model life of about 12 months, and by my count 21 text-model shutdowns are scheduled between Oct 20 and Dec 11, 2026. Every agent gets re-qualified on a new model at least once a year. Evals are the regression suite for that day. And Dynatrace and Datadog management both name token overruns as the customer fear, which is why a dollar figure on every trace is table stakes.</li>
+    </ul>
 
-  <div class="prose">
     <h3><span class="letter">A · AGENT HEALTH PACK</span><br>Free, deterministic, offered automatically</h3>
-    <p>On agent projects, Add Eval offers six built-in checks that need no model and no provider key: <code>completed</code>, <code>tool_budget</code>, <code>tool_loop</code>, <code>truncated_output</code>, <code>error_in_trace</code>, <code>latency_outlier</code>. Pure functions over attributes the instrumentors already emit. Exactly what I wrote by hand on day one. Free on every plan.</p>
+    <ul class="kv">
+      <li><b>The MVP</b> On agent projects, Add Eval offers six built-in checks that need no model and no provider key: <code>completed</code>, <code>tool_budget</code>, <code>tool_loop</code>, <code>truncated_output</code>, <code>error_in_trace</code>, <code>latency_outlier</code>. Pure functions over attributes the instrumentors already emit. Exactly what I wrote by hand on day one. Free on every plan.</li>
+      <li><b>Detect agents by shape, not label</b> A root span with a TOOL descendant and more than one LLM descendant. Most instrumentors label the orchestrator CHAIN, not AGENT, so keying on span kind would miss most LangGraph and ADK agents.</li>
+    </ul>
   </div>
   <figure class="band wide"><svg viewBox="0 0 760 330" role="img" aria-label="Mock of the Add Evaluator modal with an Agent Health pack card at the top">
           <g font-size="12" fill="var(--ink)">
@@ -260,15 +291,19 @@
           <rect x="267" y="210" width="226" height="92" rx="8" fill="var(--surface)" stroke="var(--line)"/><text x="283" y="234" font-weight="600">Code Evaluator</text><rect x="400" y="221" width="70" height="18" rx="9" fill="var(--line)"/><text x="435" y="234" text-anchor="middle" font-size="11">Enterprise</text><text x="283" y="252" fill="var(--muted)">Custom Python. The pack covers</text><text x="283" y="268" fill="var(--muted)">the first six without it.</text>
           <rect x="512" y="210" width="226" height="92" rx="8" fill="var(--surface)" stroke="var(--line)"/><text x="528" y="234" font-weight="600">Agent-as-a-Judge</text><text x="528" y="252" fill="var(--muted)">Claude Code sandbox.</text>
           </g>
-        </svg><figcaption>Mock: the Add Evaluators modal on an agent-shaped project. The pack sits above the custom options, with Code Evaluator still Enterprise.</figcaption></figure>
+        </svg><figcaption>Mock: Add Evaluators on an agent-shaped project. The pack sits above the custom options. Code Evaluator stays Enterprise.</figcaption></figure>
   <div class="prose">
-    <p><strong>Detect agents by shape, not by label.</strong> An agent is a root span with a TOOL descendant and more than one LLM descendant. Most instrumentors label the orchestrator CHAIN, not AGENT, so keying on span kind would miss most LangGraph and ADK agents.</p>
-
     <h3><span class="letter">B · TRAJECTORY FIRST</span><br>Offer the judge what the agent saw</h3>
-    <p>From an agent project, lead with trace scope and a <code>{trajectory}</code> variable: tool calls in order, with arguments, truncated results and status. Offered, not defaulted. It waits for trace completion and costs several times the tokens on the customer's key, so the estimate is shown first.</p>
+    <ul class="kv">
+      <li><b>The MVP</b> From an agent project, lead with trace scope and a <code>{trajectory}</code> variable: tool calls in order, with arguments, truncated results and status.</li>
+      <li><b>Offered, not defaulted</b> It waits for trace completion and costs several times the tokens on the customer's key, so the estimate is shown first.</li>
+    </ul>
 
     <h3><span class="letter">C · PRE-FLIGHT</span><br>Run it on three real spans before Save</h3>
-    <p>Validate required fields inline. Translate provider errors into plain language with the fix attached. Stop forcing tool choice on models that reject it. <strong>Quick win alongside:</strong> a default price table, so Cost stops reading "--."</p>
+    <ul class="kv">
+      <li><b>The MVP</b> Validate required fields inline. Translate provider errors into plain language with the fix attached. Stop forcing tool choice on models that reject it.</li>
+      <li><b>Quick win alongside</b> A default price table, so Cost stops reading "--."</li>
+    </ul>
   </div>
   <figure class="band wide"><svg viewBox="0 0 760 360" role="img" aria-label="Mock of the evaluator builder with a trajectory variable and a pre-flight panel that explains a provider error in plain language">
           <g font-size="12" fill="var(--ink)">
@@ -332,11 +367,11 @@
   <div class="prose">
     <h3>How I'd take it to engineering</h3>
     <ol class="seq">
-      <li><strong>Start with three repros, independent of the bet.</strong> Forced <code>tool_choice</code> on 5.5 models, the dot-in-eval-name error that blames span matching, and the Cost tab setting a time range the plan can't serve. Each is a small change with a clear test, and each removes a moment where a trial ends.</li>
-      <li><strong>Pre-flight, one sprint.</strong> It reuses the existing "Test Evaluator On Spans" call. What changes is the order (pre-flight before Save), client-side validation, and a table that maps errors to suggested fixes.</li>
-      <li><strong>The pack, two sprints.</strong> Six pure functions, one UI card. The eval-column plumbing already exists. The detector can run lazily when Add Eval opens before we commit to running it on ingest.</li>
-      <li><strong>Trajectory last.</strong> It touches template variable resolution, trace-completion timing and the Add Eval entry point. Before designing it I'd ask the team two questions: how the online pipeline decides a trace is complete, and what the median judge input size is today.</li>
-      <li><strong>Plan gating is a funnel argument.</strong> The pack is free on every plan. Deterministic checks are what keep people around long enough to buy judges, Signal and seats. Gating them gates the funnel.</li>
+      <li><strong>Three repros first, independent of the bet.</strong> Forced <code>tool_choice</code> on 5.5 models, the dot-in-eval-name error that blames span matching, and the Cost tab setting a range the plan can't serve. Small changes, clear tests, and each removes a moment where a trial ends.</li>
+      <li><strong>Pre-flight, one sprint.</strong> Reuses the existing "Test Evaluator On Spans" call. What changes: the order (pre-flight before Save), client-side validation, and a table mapping errors to fixes.</li>
+      <li><strong>The pack, two sprints.</strong> Six pure functions, one UI card. The eval-column plumbing exists. The detector can run lazily when Add Eval opens before we commit to running it on ingest.</li>
+      <li><strong>Trajectory last.</strong> It touches template variable resolution, trace-completion timing and the Add Eval entry point. Two questions for the team before designing it: how does the online pipeline decide a trace is complete, and what's the median judge input size today?</li>
+      <li><strong>Plan gating is a funnel argument.</strong> Deterministic checks are what keep people around long enough to buy judges, Signal and seats. Gating them gates the funnel.</li>
     </ol>
 
     <h3>How I'd know it worked</h3>
@@ -351,42 +386,46 @@
         <tr><td>Projects showing a dollar cost on day one</td><td>0 of 1</td><td>every project with a known model</td></tr>
       </tbody>
     </table></div>
-    <p class="note">Counterweight: if the pack lifts eval adoption but judge usage falls, the free tier is cannibalizing instead of feeding the funnel. Watch both.</p>
+    <p class="note"><strong>Counterweight:</strong> if the pack lifts eval adoption but judge usage falls, the free tier is cannibalizing instead of feeding the funnel. Watch both.</p>
 
     <h3>Who else is here</h3>
-    <p>No competitor I checked offers a free, prebuilt, no-LLM health pack for agents. Grafana's Agent Observability, generally available since July, already scores multi-step turns and whole conversations with LLM judges, so trajectory-aware judging alone isn't a moat. What would set AX apart is the combination: free deterministic checks that every agent gets on day one, trajectory-aware judging, and verdicts that flow into the parent platform's workflows.</p>
+    <p>No competitor I checked offers a free, prebuilt, no-LLM health pack for agents. Grafana's Agent Observability, GA since July, already scores multi-step turns and whole conversations with LLM judges, so trajectory-aware judging alone isn't a moat. What would set AX apart is the combination: free deterministic checks every agent gets on day one, trajectory-aware judging, and verdicts that flow into the parent platform's workflows.</p>
     <p class="src"><a href="https://grafana.com/docs/grafana-cloud/machine-learning/ai-observability/guides/evaluation/">Grafana evaluation docs</a> · <a href="https://grafana.com/whats-new/2026-07-30-say-goodbye-to-black-box-agents-with-agent-observability/">GA note</a></p>
 
     <h3>What I'm not proposing</h3>
     <p>A new eval DSL. A replacement for Code Evaluators on Enterprise, which stay the path for custom checks. Changes to Signal or Alyx. The pack is deliberately boring: six checks that hold for every tool-using agent.</p>
 
     <h3>Limits of this evidence</h3>
-    <p>One user, one free-tier account, one agent, one week. The judge findings come from 32 spans. The voice-of-customer data is public discussion and over-represents developers who post. 81% of it comes from GitHub, and enterprise buyers barely appear. What the evidence does support is the shape of the on-ramp problem and the specific failures, each of which I can reproduce.</p>
+    <p>One user, one free-tier account, one agent, one week. The judge findings come from 32 spans. The voice-of-customer data is public discussion and over-represents developers who post (81% GitHub; enterprise buyers barely appear). What it does support is the shape of the on-ramp problem and the specific failures, each of which I can reproduce.</p>
   </div>
 </section>
 
 <!-- ============================================================ 6 -->
 <section class="part" id="artifacts">
-  <div class="part-head"><div class="num">6</div><h2>Artifacts, method, and where AI tools helped</h2></div>
+  <div class="part-head"><div class="num">6</div><h2>Artifacts, method, and where Claude Code helped</h2></div>
   <div class="prose">
     <h3>Artifacts</h3>
     <!-- SCREEN RECORDING: when you have a Loom/YouTube URL, replace the paragraph below with:
          <div class="video"><iframe src="EMBED_URL" title="Walkthrough: the judge builder and the experiment run" allowfullscreen loading="lazy"></iframe></div>
          <p class="note">A 6-minute walkthrough: tracing a review, building the judge (all three attempts), the backfill, and the v1 vs v2 experiment.</p> -->
     <ul class="artifacts">
-      <li><b>The agent</b> About 400 lines of Python: five <code>gh</code>-backed tools, the tool-use loop, the deterministic verifier, and the OpenInference tracing (one AGENT root, TOOL spans, a CHAIN span for the verifier). Prompt v1 and v2.</li>
-      <li><b>Dataset and experiments</b> 74 labeled PRs from two repos with evidence and hand overrides, 70 uploaded to AX as two dataset versions. The experiment runner with five code evaluators and one LLM judge. The free-tier script that logs code evals back onto spans.</li>
-      <li><b>Trajectory re-judge</b> The 32 traces exported from AX and the script that judged each one with and without the trajectory.</li>
-      <li><b>Dated findings log</b> Every rough edge in the order it happened, with hurt scores assigned at the time. Unedited after the fact except typos. Thirteen screenshots, eleven of them on this page.</li>
+      <li><b>The agent</b> About 400 lines of Python: five <code>gh</code>-backed tools, the tool-use loop, the deterministic verifier, and the OpenInference tracing. Prompt v1 and v2.</li>
+      <li><b>Dataset and experiments</b> 74 labeled PRs with evidence and hand overrides, 70 uploaded to AX as two dataset versions. The experiment runner with five code evaluators and one LLM judge. The free-tier script that logs code evals back onto spans.</li>
+      <li><b>Trajectory re-judge</b> The 32 traces exported from AX and the script that judged each one with and without the trajectory. The explorer above is built from its output.</li>
+      <li><b>Dated findings log</b> Every rough edge in the order it happened, with hurt scores assigned at the time. Thirteen screenshots, eleven of them on this page.</li>
       <li><b>AX project</b> <code>docs-drift-reviewer</code>: traces, the online judge, two datasets, the v1 and v2 experiments.</li>
     </ul>
     <p class="note">Code, data and the log are available on request.</p>
 
     <h3>Method</h3>
-    <p>Everything above was done on a free-tier AX account between 2026-10-03 and 2026-10-07. Hurt scores were assigned when each item was logged, not later. The voice-of-customer figure comes from a six-month coding of public developer discussion (GitHub, Reddit, X, forums) I ran before the take-home; its limits are stated above. Model-shutdown counts come from provider deprecation pages as of October 2026.</p>
+    <p>Everything above was done on a free-tier AX account between Oct 3 and Oct 7, 2026. Hurt scores were assigned when each item was logged, not later. The voice-of-customer figure comes from a six-month coding of public developer discussion I ran before the take-home. Model-shutdown counts come from provider deprecation pages as of October 2026.</p>
 
-    <h3>Where AI coding tools helped</h3>
-    <p>I built the agent, the tracing and the experiment harness with Claude Code. It helped most where the spec was clear: the deterministic verifier, the dataset labeler, and moving the experiments onto a different runtime when my API credits ran out. For the judge-builder sequence I had it drive the browser while I watched, which is how the three failures got captured with screenshots in the order they happened. It helped least with the SDK's newer surfaces: the docs it knew were stale, so it introspected function signatures, and the eval-naming rule isn't documented anywhere a model would think to look. The hurt scores, the proposal, and any mistakes are mine.</p>
+    <h3>Where Claude Code helped, and where it didn't</h3>
+    <ul class="kv">
+      <li><b>Helped most</b> Work with a clear spec: the deterministic verifier, the dataset labeler, the experiment harness, and moving the experiments to a different runtime when my API credits ran out. I also had it drive the AX UI while I watched, which is how the three judge-builder failures were captured with screenshots in the order they happened.</li>
+      <li><b>Helped least</b> The SDK's newer surfaces. The docs it knew were stale, so it introspected function signatures, and the eval-naming rule isn't documented anywhere a model would think to look.</li>
+      <li><b>Mine</b> The use case, the hurt scores, what to cut, and the proposal. I read every judge explanation and every experiment row myself. Any mistakes here are mine too.</li>
+    </ul>
   </div>
 </section>
 
