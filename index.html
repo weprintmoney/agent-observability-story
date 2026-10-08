@@ -114,7 +114,7 @@
     <h3>1. Cost is a black box</h3>
     <ul class="kv">
       <li><b>The issue</b> AX counted 687k input tokens and had the model name on every span. Cost read "--" everywhere: project header, Cost tab, Sessions, Experiments. Right next to an upsell for a cost-reduction agent.</li>
-      <li><b>The fix</b> Ship a default price table for the ten most common models. You can't reduce spend you can't see.</li>
+      <li><b>The fix</b> Price tokens at public list rates, label them as estimates, and let customers upgrade to accurate cost tracking. You can't reduce spend you can't see.</li>
     </ul>
   </div>
   <div class="gallery wide two">
@@ -125,17 +125,17 @@
   <div class="prose">
     <h3>2. The first gate: Code Evaluators, and a hidden naming rule</h3>
     <ul class="kv">
-      <li><b>The issue</b> The first evals I wanted were deterministic: did it submit, did the findings verify, did it stay in budget. Code Evaluator is Enterprise-only. So I computed them locally and wrote them back with <code>spans.update_evaluations</code>. All 32 failed with "No matching span found."</li>
-      <li><b>The cause</b> Dots aren't allowed in eval names. That rule prints at INFO level, above the errors. I spent ten minutes chasing span ids for a naming mistake.</li>
+      <li><b>The issue</b> The first evals I wanted were deterministic: did it submit, did the findings verify, did it stay in budget. Code Evaluator is Enterprise-only, so I computed them locally and wrote them back with <code>spans.update_evaluations</code>. All 32 failed with “No matching span found.”</li>
+      <li><b>The cause</b> A naming rule: dots are not allowed in eval names. That rule prints at INFO, above the errors. I spent ten minutes chasing span ids for a naming mistake.</li>
       <li><b>The fix</b> Make the naming rule a validation error, and fail the call when every eval column gets dropped. And put the cheapest, first evals a developer writes on every plan (more on that in the proposal).</li>
     </ul>
 
     <h3>3. The LLM judge builder failed three times in a row</h3>
-    <p>The builder itself is clear and linear: type, name, scope, model, template with <code>{variables}</code>, map to real columns with a live preview. Then "Test Evaluator On Spans":</p>
+    <p>The builder itself is clear and linear: type, name, scope, model, template with <code>{variables}</code>, then map to real columns with a live preview. Then “Test Evaluator On Spans”:</p>
     <ol class="good">
-      <li><b>Raw GraphQL error.</b> "Classification choices are required." Nothing in the form had asked for them. The Labels section sits below the template, below the fold, with no required marker.</li>
-      <li><b>Provider error.</b> The runner forces <code>tool_choice</code>, which Claude 5.5 models reject. The picker offers those models anyway. <em>Eng note: an afternoon's fix (don't force tool choice on models that reject it, or hide them). A trial user just concludes evals are broken.</em></li>
-      <li><b>The workaround, found by guessing.</b> Advanced Options, "Enable Function Calling" off. Third test: GROUNDED in about 8 seconds. The model was fine the whole time.</li>
+      <li><b>Raw GraphQL error.</b> “Classification choices are required.” Nothing in the form had asked for them. The Labels section sits below the template, below the fold, with no required marker.</li>
+      <li><b>Provider error.</b> The runner forces <code>tool_choice</code>, which Claude 5.5 models reject. The picker offers those models anyway. <em>Eng note: an afternoon’s fix (don’t force tool choice on models that reject it, or hide them). A trial user just concludes evals are broken.</em></li>
+      <li><b>The workaround, found by guessing.</b> Advanced Options, “Enable Function Calling” off. Third test: GROUNDED in about 8 seconds. The model was fine the whole time.</li>
     </ol>
   </div>
   <div class="gallery wide">
@@ -148,9 +148,9 @@
   <div class="prose">
     <h3>4. The silent-failure experiment</h3>
     <ul class="kv">
-      <li><b>The issue</b> My first experiment ran out of API credits after 16 rows. My task returned the error string instead of raising. AX marked all 70 runs COMPLETED and my evaluators scored 54 identical error strings as predictions.</li>
-      <li><b>Whose bug</b> Mine, and I fixed it: the task now raises, and evaluators skip failed rows. But the experiment page showed 70 green runs with no hint that 54 outputs were the same string.</li>
-      <li><b>The fix</b> One heuristic nudge: "54 of 70 outputs are identical. Do these look like errors?"</li>
+      <li><b>The issue</b> My first experiment ran out of API credits after 16 rows. The task returned the error string instead of raising. AX marked all 70 runs COMPLETED, and my evaluators scored 54 identical error strings as predictions.</li>
+      <li><b>Whose bug</b> That bug was mine, and I fixed it: the task now raises, and evaluators skip failed rows. The experiment page still showed 70 green runs, with no hint that 54 outputs were the same string.</li>
+      <li><b>The fix</b> One heuristic nudge: “54 of 70 outputs are identical. Do these look like errors?”</li>
     </ul>
     <figure class="band"><svg viewBox="0 0 640 380" role="img" aria-label="Seventy experiment runs all marked completed; fifty-four of them contain the same error string">
           <text x="20" y="34" font-size="14" font-weight="700" fill="var(--ink)">70 runs · status: COMPLETED</text>
@@ -160,9 +160,9 @@
 
     <h3>5. Prompt Playground: close, but two bugs in the loop</h3>
     <ul class="kv">
-      <li><b>What it is</b> A single-call prompt tool: dataset variables, optional function schemas, one model call per row. It can't run my tool loop (the "agent endpoint" quickstart is the path for that), but it can compare judge prompts over the agent's real outputs, which is what I tried.</li>
-      <li><b>The issue</b> Column B's model picker closed itself about a second after opening, six attempts running. Two datasets I'd created through the SDK minutes earlier didn't appear in the dropdown until a hard reload. The comparison ran from code instead.</li>
-      <li><b>Why it matters</b> The code-to-UI loop the dev workflow depends on has a cache in it, and the A/B tool's B column is hard to configure.</li>
+      <li><b>What it is</b> It is a single-call prompt tool: dataset variables, optional function schemas, one model call per row. It cannot run my tool loop (the “agent endpoint” quickstart is the path for that), but it can compare judge prompts over the agent’s real outputs, which is what I tried.</li>
+      <li><b>The issue</b> Column B’s model picker closed itself about a second after opening, six attempts running. Two datasets I had created through the SDK minutes earlier did not appear in the dropdown until a hard reload. The comparison ran from code instead.</li>
+      <li><b>Why it matters</b> The code-to-UI loop the dev workflow depends on has a cache in it, and the A/B tool’s B column is hard to configure.</li>
     </ul>
   </div>
   <div class="gallery wide two">
@@ -182,12 +182,12 @@
   <div class="part-head"><div class="num">4</div><h2>The aha: an agent judge has to see the trajectory</h2></div>
   <div class="prose">
     <p>When the online judge finally ran, it scored 24 of 32 reviews GROUNDED and 8 UNGROUNDED. (The first backfill, in the screenshot, was 19 of 24 scored spans, which is the 79%.)</p>
-    <p>I read the 8 failures. Every one had the same shape. The agent's summary stated something it had verified with a tool ("nothing was renamed or deleted"). The judge, which sees only <code>attributes.output.value</code> on the AGENT span, called it unsupported. The trace held the <code>get_pr</code> result that proved it. The judge never saw it.</p>
+    <p>I read the 8 failures. Every one had the same shape. The agent’s summary stated something it had verified with a tool (“nothing was renamed or deleted”). The judge, which sees only <code>attributes.output.value</code> on the AGENT span, called it unsupported. The trace held the <code>get_pr</code> result that proved it. The judge never saw it.</p>
     <p><strong>The judge was right about its inputs and wrong about the agent.</strong></p>
     <h3>I tested the fix instead of asserting it</h3>
-    <p>I exported the 32 traces from AX and re-judged each one twice with Claude Sonnet 5.5: once on the output alone, once with the agent's task, its rules, and its tool calls in order.</p>
+    <p>I exported the 32 traces from AX and re-judged each one twice with Claude Sonnet 5.5: once on the output alone, once with the agent’s task, its rules, and its tool calls in order.</p>
     <ul class="kv">
-      <li><b>Without the trajectory</b> A strict judge passed 2 of 32. AX's lenient template had passed 24. The verdict tracked the prompt, not the agent.</li>
+      <li><b>Without the trajectory</b> A strict judge passed 2 of 32. AX’s lenient template had passed 24. The verdict tracked the prompt, not the agent.</li>
       <li><b>With the trajectory</b> 26 of 32. Five of the eight UNGROUNDED verdicts flipped to GROUNDED, each citing the tool result. Three reviews AX had passed were now flagged, each citing the line the summary contradicted. On my reading, all three flags are right.</li>
     </ul>
   </div>
@@ -231,7 +231,7 @@
           <div><b>What the judge said, with the trajectory</b><p class="ex-traj"></p></div>
         </div>
       </div>
-      <p class="ex-foot">Re-judged with Claude Sonnet 5.5 on 2026-10-07 from the 32 traces exported from AX. Explanations are the judge's own, trimmed, with names from my course repos replaced by roles. The AX online verdicts come from the review-grounded-judge task in the project.</p>
+      <p class="ex-foot">Judged with Claude Sonnet 5.5 from the 32 traces exported from AX. Explanations are the judge's own, trimmed. The AX online verdicts come from the review-grounded-judge task in the project.</p>
     </div>
   </div>
 
@@ -245,7 +245,7 @@
   <div class="part-head"><div class="num">5</div><h2>What I'd build</h2><p class="intro">Make the first useful eval on an agent project take under five minutes, with no provider key and no plan upgrade, and put the trajectory in front of the judge before the user has to ask.</p></div>
   <div class="prose">
     <h3>The problem, plainly</h3>
-    <p>Tracing proves its value on day one. Evals don't. Between "traces are flowing" and "a score I trust" sit four gates, and I hit all four in one afternoon.</p>
+    <p>Tracing proves its value on day one. Evals don't. Between "traces are flowing" and "a score I trust" are several hurdles.</p>
     <figure class="band"><svg viewBox="0 0 640 440" role="img" aria-label="Four gates between traces flowing and a trusted score: provider key, enterprise gate on code evals, builder errors, judge without trajectory">
           <g font-size="13" fill="var(--ink)">
             <rect x="20" y="20" width="600" height="56" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="40" y="54" font-weight="700">Traces are flowing</text><text x="600" y="54" text-anchor="end" font-size="12" fill="var(--accent)">minute 1</text>
