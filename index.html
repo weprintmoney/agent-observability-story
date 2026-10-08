@@ -27,8 +27,7 @@
   <div class="hero-inner">
     <div class="kicker">Arize PM take-home · an AX field test</div>
     <h1>Agent evals that <em>work on day one</em></h1>
-    <div class="byline"><span>By <b>Charlcye Mitchell</b></span><span>Oct 3 to 7, 2026</span><span>Free tier</span><span>~9 min read</span></div>
-    <p class="prov">Judgments, hurt scores and the proposal are mine. I used Claude Code to build the harness and verifier, drive the AX UI for the screenshots, and draft this write-up, which I edited.</p>
+    <div class="byline"><span>By <b>Charlcye Mitchell</b></span><span>Oct 8, 2026</span><span>Free tier</span><span>~9 min read</span></div>
   </div>
 </section>
 
@@ -45,9 +44,9 @@
   <div class="prose">
     <p>A <strong>docs-drift reviewer</strong> on Claude Opus 5.5.</p>
     <ul class="kv">
-      <li><b>The problem</b> My agent pipelines use per-folder <code>CLAUDE.md</code> files as their map. When a PR merges and the index drifts, downstream agents silently miss documents. I used to check every merge by hand.</li>
+      <li><b>The problem</b> My agent pipelines use per-folder <code>CLAUDE.md</code> files as an index for their context navigation. When a new PR merges into the repository and the index drifts from the contents, downstream agents silently miss documents. I used to manually check for this drift periodically.</li>
       <li><b>The agent</b> Given a merged PR, it reads the repo's own doc rules, checks every added or renamed file against the nearest index, greps the index docs for stale paths, and submits structured findings. A deterministic verifier re-checks each finding and marks the root span ERROR if one doesn't hold up.</li>
-      <li><b>The data</b> 74 labeled PRs from two of my repos. Real user (me), real failure cost, real ground truth: the repos carry an explicit "update the doc index" rule, so merge history is a labeled dataset.</li>
+      <li><b>The data</b> To create and test this agent, I used 74 labeled PRs from two of my repos. Real user (me), real failure cost, real ground truth: the repos carry an explicit "update the doc index" hook, so my merge history provided a labeled dataset.</li>
     </ul>
     <figure class="band"><svg viewBox="0 0 760 230" role="img" aria-label="Agent shape: one AGENT root span, a loop of LLM and TOOL spans, and a verifier CHAIN span">
           <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker></defs>
@@ -66,7 +65,7 @@
           <text x="10" y="206" font-size="13" fill="var(--muted)">and marks the root span ERROR if any finding doesn't hold up.</text>
           </g>
         </svg><figcaption>One AGENT root, auto-instrumented LLM spans, a TOOL span per call, one CHAIN span for the verifier. 4 to 7 turns per review.</figcaption></figure>
-    <p><strong>First traced batch:</strong> right on 26 of 31, plus 6 verified problems my labels had missed. Two of my first three "false positives" were label errors. The agent corrected my dataset three times that week.</p>
+    <p><strong>First traced batch:</strong> right on 26 of 31, plus 6 verified problems my labels had missed. Two of my first three "false positives" were label errors. The agent corrected my dataset three times.</p>
   </div>
 </section>
 
@@ -76,10 +75,10 @@
   <div class="prose">
     <ol class="good">
       <li><b>Tracing worked on the first try.</b> <code>register()</code>, the Anthropic auto-instrumentor, and my own AGENT, TOOL and CHAIN spans. Traces appeared in under a minute.</li>
-      <li><b>The trace drawer is the best screen in the product.</b> The whole agent in one tree, latency and tokens per step, the review summary readable in place. This is the screen that made me trust the rest.</li>
+      <li><b>The trace drawer is the best screen in the product.</b> The whole agent in one tree, latency and tokens per step, the review summary readable in place. This screen made me trust the rest.</li>
       <li><b>Agent Graph got the topology right in one look.</b> Start, the agent, six tool and LLM nodes, end. Sequence is flattened, so you can't see that <code>get_pr</code> always runs first; that lives in Agent Path.</li>
-      <li><b>Dataset upload just worked.</b> 70 rows as a list of dicts, mixed string and integer columns, first try. One gap: when the agent corrected a label, I couldn't find the example to update in place within the default page size of 50, so I shipped a v2 dataset (versioning is in the API, I just didn't reach it). There's also no one-click "this row's label is wrong" from the experiment view back into the dataset, and I needed it three times.</li>
-      <li><b>Experiments saved me from shipping a bad prompt.</b> I wrote prompt v2 with two rules the first batch had missed, then ran v1 against v2 over all 70 labeled PRs as AX experiments: the agent as the task, five code evaluators, one LLM judge. v2 fixed the case it was written for and broke three others. Without the experiment I'd have shipped the regression on one fixed example.</li>
+      <li><b>Dataset upload just worked.</b> 70 rows as a list of dicts, mixed string and integer columns, first try. One gap: when the agent corrected a label, I couldn't find the example to update in place within the default page size of 50, so I shipped a v2 dataset (versioning is in the API, I just didn't reach it). There's also no one-click "this row's label is wrong" from the experiment view back into the dataset, which would have been useful.</li>
+      <li><b>Experiments saved me from shipping a bad prompt.</b> I wrote prompt v2 with two rules the first batch had missed, then ran v1 against v2 over all 70 labeled PRs as AX experiments: the agent as the task, five code evaluators, one LLM judge. v2 fixed the case it was written for and broke three others. Without the experiment I probably would have shipped the regression on one fixed example.</li>
     </ol>
   </div>
   <div class="gallery wide">
